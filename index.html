@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Clawbert Clone - Kawaii Crane Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --primary: #ff85a2;
+            --secondary: #ffb7c5;
+            --accent: #f9f871;
+            --machine-rot: 0deg;
+            --bg-pattern: #fff0f3;
+        }
+
+        body {
+            background-color: var(--bg-pattern);
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(255, 133, 162, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(249, 248, 113, 0.15) 0%, transparent 50%);
+            transition: background 0.5s ease;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+            touch-action: manipulation;
+        }
+
+        /* Animated Background Elements */
+        .bg-decor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .shape {
+            position: absolute;
+            opacity: 0.25;
+            filter: blur(1px);
+            animation: float 25s infinite linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(115vh) rotate(0deg); }
+            100% { transform: translateY(-20vh) rotate(360deg); }
+        }
+
+        /* Themes */
+        .theme-arcade { 
+            --primary: #e63946; 
+            --secondary: #1d3557; 
+            --bg-pattern: #0a0a0a;
+            background-image: 
+                linear-gradient(rgba(230, 57, 70, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(230, 57, 70, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: white; 
+        }
+        .theme-kawaii { 
+            --primary: #ff85a2; 
+            --secondary: #ffb7c5; 
+            --bg-pattern: #fff0f3;
+        }
+        .theme-night { 
+            --primary: #4831d4; 
+            --secondary: #2d1b4d; 
+            --bg-pattern: #1a1a2e;
+            background-image: radial-gradient(circle at 50% 50%, #2d1b4d 0%, #1a1a2e 100%);
+            color: #ccff00; 
+        }
+
+        /* 3D Machine Styles - Perspective adjusted to match photo */
+        .machine-viewport {
+            perspective: 1000px;
+            width: 340px;
+            height: 500px;
+            margin: 10px auto;
+            position: relative;
+            cursor: grab;
+            touch-action: none;
+        }
+        
+        .machine-viewport:active { cursor: grabbing; }
+
+        .machine-body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            /* Default tilt to match the photo's perspective */
+            transform: rotateX(-5deg) rotateY(var(--machine-rot)); 
+            transition: transform 0.1s linear;
+            pointer-events: none;
+        }
+
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+            border: 12px solid var(--primary);
+            box-sizing: border-box;
+            backdrop-filter: blur(1px);
+        }
+
+        /* Front Glass - thinner border on top to show "hood" */
+        .front  { 
+            transform: translateZ(150px); 
+            border-bottom: 90px solid var(--primary); 
+            border-top: 4px solid var(--primary);
+            background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.1) 100%);
+        }
+        
+        .back   { 
+            transform: rotateY(180deg) translateZ(150px); 
+            background: var(--secondary); 
+            opacity: 1; 
+            border: 12px solid var(--primary);
+            background-image: radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, transparent 80%);
+        }
+        
+        .left   { transform: rotateY(-90deg) translateZ(170px); width: 300px; }
+        .right  { transform: rotateY(90deg) translateZ(170px); width: 300px; }
+        
+        .bottom { 
+            transform: rotateX(-90deg) translateZ(250px); 
+            height: 300px; 
+            background: var(--primary); 
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.2);
+        }
+
+        .top {
+            transform: rotateX(90deg) translateZ(-10px);
+            height: 300px;
+            background: var(--primary);
+            border: 4px solid rgba(0,0,0,0.1);
+        }
+
+        /* Claw Styles */
+        #claw-assembly {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateZ(100px);
+            z-index: 50;
+            transition: all 1s ease-in-out;
+        }
+
+        .claw-arm {
+            width: 8px;
+            height: 60px;
+            background: linear-gradient(to right, #ccc, #eee, #ccc);
+            margin: 0 auto;
+            border: 1px solid #999;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.2);
+        }
+
+        .claw-tongs {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            transition: transform 0.3s;
+        }
+
+        .tong {
+            width: 16px;
+            height: 40px;
+            background: #ddd;
+            border-radius: 10px;
+            border: 2px solid #bbb;
+            transition: transform 0.3s;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .claw-open .tong-left { transform: rotate(40deg); }
+        .claw-open .tong-right { transform: rotate(-40deg); }
+
+        .dropbox {
+            position: absolute;
+            bottom: 0;
+            left: 10px;
+            width: 90px;
+            height: 90px;
+            background: #1a1a1a;
+            transform: translateZ(151px);
+            border: 6px solid var(--accent);
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .dropbox::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            top: 0;
+        }
+
+        @keyframes ssr-glow {
+            0% { filter: drop-shadow(0 0 8px gold); transform: scale(1) rotate(0); }
+            50% { filter: drop-shadow(0 0 25px gold); transform: scale(1.05) rotate(3deg); }
+            100% { filter: drop-shadow(0 0 8px gold); transform: scale(1) rotate(0); }
+        }
+
+        .ssr-animation { animation: ssr-glow 0.8s infinite; }
+
+        /* Large & Visible Eggs - Improved styling */
+        .egg {
+            width: 70px;
+            height: 90px;
+            border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%;
+            cursor: pointer;
+            transition: 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 
+                inset -10px -10px 20px rgba(0,0,0,0.15),
+                inset 10px 10px 20px rgba(255,255,255,0.5),
+                0 6px 12px rgba(0,0,0,0.2);
+            position: relative;
+            border: 4px solid rgba(255,255,255,0.9);
+        }
+
+        .egg::after {
+            content: '';
+            position: absolute;
+            top: 15%;
+            left: 20%;
+            width: 18px;
+            height: 28px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            transform: rotate(20deg);
+        }
+
+        .nest {
+            background: #e0c9a6;
+            border-radius: 50%;
+            padding: 20px;
+            box-shadow: inset 0 8px 15px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .hidden-screen { display: none !important; }
+        
+        .swipe-hint {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            pointer-events: none;
+            opacity: 0.9;
+            animation: pulse 2s infinite;
+            z-index: 60;
+            white-space: nowrap;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, 0); }
+            50% { opacity: 1; transform: translate(-50%, -5px); }
+        }
+
+        /* Floor/Shadow for machine */
+        .machine-shadow {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 40px;
+            background: rgba(0,0,0,0.1);
+            filter: blur(15px);
+            border-radius: 50%;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="theme-kawaii">
+
+    <div class="bg-decor" id="bg-decor"></div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="modal-settings" class="hidden-screen fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md space-y-6 text-gray-800 relative">
+            <button onclick="toggleSettings(false)" class="absolute top-4 right-4 text-2xl font-bold text-gray-400 hover:text-gray-600 transition-colors">&times;</button>
+            <h2 class="text-2xl font-black text-[var(--primary)] text-center">Settings / 設置</h2>
+            
+            <div>
+                <label id="lbl-lang" class="block font-bold mb-2 text-sm">Language / 語言</label>
+                <select id="set-lang" class="w-full p-3 border-2 border-[var(--primary)] rounded-xl outline-none bg-white">
+                    <option value="en">English</option>
+                    <option value="zh">繁體中文 (Traditional Chinese)</option>
+                </select>
+            </div>
+
+            <div>
+                <label id="lbl-theme" class="block font-bold mb-2 text-sm">Theme / 主題</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="changeTheme('kawaii')" class="p-2 text-xs bg-pink-50 rounded-lg border-2 border-pink-200 hover:border-pink-400">Kawaii</button>
+                    <button onclick="changeTheme('arcade')" class="p-2 text-xs bg-red-50 rounded-lg border-2 border-red-200 hover:border-red-400">Arcade</button>
+                    <button onclick="changeTheme('night')" class="p-2 text-xs bg-indigo-50 rounded-lg border-2 border-indigo-200 hover:border-indigo-400">Night</button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between">
+                <span id="lbl-sound" class="font-bold text-gray-800 text-sm">Sound Effects</span>
+                <input type="checkbox" id="set-sound" checked class="w-6 h-6 accent-[var(--primary)]">
+            </div>
+
+            <button onclick="toggleSettings(false)" class="w-full py-3 bg-gray-100 text-gray-800 font-bold rounded-xl shadow-md hover:bg-gray-200 transition-colors">
+                CLOSE
+            </button>
+        </div>
+    </div>
+
+    <!-- START SCREEN -->
+    <div id="screen-start" class="fixed inset-0 z-[100] flex flex-col items-center justify-center p-6">
+        <div class="relative mb-16">
+            <div class="absolute -inset-8 bg-white/40 blur-3xl rounded-full"></div>
+            <h1 id="txt-title" class="relative text-7xl font-black text-center text-[var(--primary)] drop-shadow-[0_5px_0_white] scale-110 tracking-tighter uppercase">CLAWBERT</h1>
+        </div>
+        
+        <div class="flex flex-col items-center gap-6">
+            <button onclick="startGame()" class="px-24 py-6 bg-[var(--primary)] text-white font-black text-4xl rounded-full shadow-[0_10px_0_#d66d86] hover:translate-y-1 hover:shadow-[0_6px_0_#d66d86] transition-all active:scale-95">
+                PLAY
+            </button>
+
+            <button onclick="toggleSettings(true)" class="flex items-center gap-2 px-10 py-3 bg-white/95 text-gray-600 font-bold rounded-full shadow-lg border-2 border-[var(--primary)] hover:bg-white transition-all active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                SETTINGS
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME SCREEN -->
+    <div id="screen-game" class="hidden-screen min-h-screen flex flex-col items-center">
+        <!-- Status Ticker -->
+        <div class="w-full bg-white/80 backdrop-blur-md p-2 text-center font-bold border-b-4 border-[var(--primary)] sticky top-0 z-50 flex justify-between px-4 items-center">
+            <span id="status-msg">Welcome to Clawbert!</span>
+            <button onclick="toggleSettings(true)" class="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+        </div>
+
+        <div id="swipe-area" class="machine-viewport">
+            <div class="machine-shadow"></div>
+            <div id="machine-body" class="machine-body">
+                <div class="face top"></div>
+                <div class="face front"></div>
+                <div class="face back"></div>
+                <div class="face left"></div>
+                <div class="face right"></div>
+                <div class="face bottom"></div>
+                
+                <div class="dropbox">
+                    <div class="w-10 h-10 rounded-full bg-pink-500 opacity-40 blur-md"></div>
+                </div>
+
+                <div id="claw-assembly">
+                    <div class="claw-arm"></div>
+                    <div id="claw-tongs" class="claw-tongs">
+                        <div class="tong tong-left"></div>
+                        <div class="tong tong-right"></div>
+                    </div>
+                </div>
+
+                <!-- Eggs are positioned in 3D space -->
+                <div id="machine-eggs" class="absolute inset-0 flex flex-wrap justify-center items-end pb-24 px-6 gap-6 pointer-events-none" style="transform: translateZ(140px)">
+                </div>
+            </div>
+            <div id="hint" class="swipe-hint">Rotate for better view</div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col items-center gap-4 w-full max-w-sm px-4 mt-auto mb-6">
+            <button id="btn-grab" onclick="grabEgg()" class="w-full py-6 bg-[var(--primary)] text-white font-black text-3xl rounded-full shadow-[0_8px_0_#d66d86] active:translate-y-1 active:shadow-none transition-all border-4 border-white/40">
+                GRAB!
+            </button>
+            <p class="text-[var(--primary)] text-xs font-bold uppercase tracking-widest bg-white/50 px-3 py-1 rounded-full">Explore the cabinet</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6 overflow-x-auto w-full px-4 justify-center">
+            <button onclick="showTab('machine')" class="flex-shrink-0 px-6 py-2 bg-white rounded-full font-bold shadow-md text-sm active:bg-gray-100 transition-all hover:scale-105">Machine</button>
+            <button onclick="showTab('eggs')" class="flex-shrink-0 px-6 py-2 bg-white rounded-full font-bold shadow-md text-sm active:bg-gray-100 transition-all hover:scale-105">Gallery</button>
+            <button onclick="showTab('toys')" class="flex-shrink-0 px-6 py-2 bg-white rounded-full font-bold shadow-md text-sm active:bg-gray-100 transition-all hover:scale-105">Collection</button>
+        </div>
+
+        <!-- Egg Gallery -->
+        <div id="tab-eggs" class="hidden-screen w-full max-w-4xl p-6">
+            <h2 class="text-2xl font-black mb-6 text-center text-[var(--primary)]">Egg Art Gallery</h2>
+            <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 gap-8"></div>
+        </div>
+
+        <!-- Toy Collection -->
+        <div id="tab-toys" class="hidden-screen w-full max-w-4xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black text-[var(--primary)]">Toy Shelf</h2>
+                <button onclick="resetGame()" class="text-xs text-red-500 underline font-bold px-2 py-1 bg-red-50 rounded border border-red-100">Clear Save</button>
+            </div>
+            <div id="toy-grid" class="grid grid-cols-3 md:grid-cols-5 gap-4"></div>
+        </div>
+    </div>
+
+    <script>
+        const TOYS_DB = [
+            { id: 1, name: "Clawbert", type: "Common Friend", rarity: "C", emoji: "🐙" },
+            { id: 2, name: "Eggsy", type: "Common Friend", rarity: "C", emoji: "🐣" },
+            { id: 3, name: "Uni", type: "Rare Pal", rarity: "R", emoji: "🦄" },
+            { id: 4, name: "Dino", type: "Rare Pal", rarity: "R", emoji: "🦖" },
+            { id: 5, name: "Golden Bun", type: "SSR Buddy", rarity: "SSR", emoji: "🐰" },
+            { id: 6, name: "Star Cat", type: "SSR Buddy", rarity: "SSR", emoji: "🐱" },
+        ];
+
+        let state = {
+            lang: 'en',
+            theme: 'kawaii',
+            rotation: 0,
+            eggs: [],
+            collection: {},
+            isGrabbing: false
+        };
+
+        const THEME_EMOJIS = {
+            kawaii: ['🌸', '✨', '☁️', '💖', '⭐', '🎈', '🍡', '🍭', '🎀', '🧸'],
+            arcade: ['🎮', '🕹️', '👾', '🔴', '⚡', '💣', '🏆', '🎰', '🎟️'],
+            night: ['🌙', '⭐', '🪐', '☄️', '🔮', '💎', '🕯️', '🌌', '🌠']
+        };
+
+        const TRANSLATIONS = {
+            en: { title: "CLAWBERT", lang: "Language", theme: "Theme", sound: "Sound Effects", play: "PLAY", statusGrab: "You caught an egg!", statusHatch: "A new friend joined!", statusEmpty: "Nothing to grab right now." },
+            zh: { title: "小爪博特", lang: "語言", theme: "主題", sound: "音效", play: "開始遊戲", statusGrab: "你抓到了一顆蛋！", statusHatch: "新朋友加入了！", statusEmpty: "現在沒東西可以抓。" }
+        };
+
+        let isTouching = false;
+        let startX = 0;
+        let startRotation = 0;
+
+        window.onload = () => {
+            loadProgress();
+            createBgElements();
+            renderMachineEggs();
+            updateUIStrings();
+            initSwipeControls();
+        };
+
+        function initSwipeControls() {
+            const area = document.getElementById('swipe-area');
+            const hint = document.getElementById('hint');
+
+            const handleStart = (e) => {
+                if (state.isGrabbing) return;
+                isTouching = true;
+                startX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                startRotation = state.rotation;
+                if (hint) hint.style.display = 'none';
+            };
+
+            const handleMove = (e) => {
+                if (!isTouching || state.isGrabbing) return;
+                const currentX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+                const diff = currentX - startX;
+                
+                let newRot = startRotation + (diff / 2);
+                
+                if (newRot > 80) newRot = 80;
+                if (newRot < -80) newRot = -80;
+                
+                state.rotation = newRot;
+                document.documentElement.style.setProperty('--machine-rot', `${state.rotation}deg`);
+            };
+
+            const handleEnd = () => {
+                isTouching = false;
+            };
+
+            area.addEventListener('mousedown', handleStart);
+            window.addEventListener('mousemove', handleMove);
+            window.addEventListener('mouseup', handleEnd);
+
+            area.addEventListener('touchstart', handleStart, { passive: true });
+            window.addEventListener('touchmove', handleMove, { passive: false });
+            window.addEventListener('touchend', handleEnd);
+        }
+
+        function createBgElements() {
+            const container = document.getElementById('bg-decor');
+            container.innerHTML = '';
+            const symbols = THEME_EMOJIS[state.theme] || THEME_EMOJIS.kawaii;
+            
+            for(let i=0; i<12; i++) {
+                const shape = document.createElement('div');
+                shape.className = 'shape';
+                shape.innerText = symbols[Math.floor(Math.random() * symbols.length)];
+                const size = (4 + Math.random() * 4);
+                shape.style.fontSize = size + 'rem';
+                shape.style.width = size + 'rem';
+                shape.style.height = size + 'rem';
+                shape.style.left = (Math.random() * 90) + 'vw';
+                shape.style.animationDuration = (20 + Math.random() * 20) + 's';
+                shape.style.animationDelay = (Math.random() * -20) + 's';
+                container.appendChild(shape);
+            }
+        }
+
+        function toggleSettings(show) {
+            const modal = document.getElementById('modal-settings');
+            if (show) modal.classList.remove('hidden-screen');
+            else modal.classList.add('hidden-screen');
+        }
+
+        function startGame() {
+            document.getElementById('screen-start').classList.add('hidden-screen');
+            document.getElementById('screen-game').classList.remove('hidden-screen');
+            updateStatus("Welcome! Grab some eggs!");
+        }
+
+        function updateUIStrings() {
+            const l = TRANSLATIONS[state.lang];
+            document.getElementById('txt-title').innerText = l.title;
+            document.getElementById('lbl-lang').innerText = l.lang;
+            document.getElementById('lbl-theme').innerText = l.theme;
+            document.getElementById('lbl-sound').innerText = l.sound;
+        }
+
+        document.getElementById('set-lang').addEventListener('change', (e) => {
+            state.lang = e.target.value;
+            updateUIStrings();
+            saveProgress();
+        });
+
+        function changeTheme(theme) {
+            state.theme = theme;
+            document.body.className = `theme-${theme}`;
+            createBgElements();
+            saveProgress();
+        }
+
+        function renderMachineEggs() {
+            const container = document.getElementById('machine-eggs');
+            container.innerHTML = '';
+            const eggColors = ['#ffd1dc', '#fff9c4', '#c8e6c9', '#bbdefb', '#e1bee7', '#ffccbc'];
+            for(let i=0; i<6; i++) {
+                const e = document.createElement('div');
+                e.className = "egg";
+                e.style.backgroundColor = eggColors[i % eggColors.length];
+                e.style.transform = `rotate(${Math.random() * 40 - 20}deg)`;
+                container.appendChild(e);
+            }
+        }
+
+        async function grabEgg() {
+            if (state.isGrabbing) return;
+            state.isGrabbing = true;
+            
+            const assembly = document.getElementById('claw-assembly');
+            const tongs = document.getElementById('claw-tongs');
+            const btn = document.getElementById('btn-grab');
+            
+            btn.disabled = true;
+            updateStatus("Lowering claw...");
+
+            const roll = Math.random();
+            let rarity = "C";
+            if (roll > 0.95) rarity = "SSR";
+            else if (roll > 0.75) rarity = "R";
+
+            const randomX = Math.floor(Math.random() * 40) - 20;
+            assembly.style.left = `calc(50% + ${randomX}%)`;
+            
+            await wait(1000);
+            tongs.classList.add('claw-open');
+            assembly.style.top = "260px";
+            
+            await wait(1000);
+            tongs.classList.remove('claw-open');
+            updateStatus("Got one!");
+            
+            const grabbedEgg = document.createElement('div');
+            const eggColors = { "SSR": "#ffeb3b", "R": "#64b5f6", "C": "#ff80ab" };
+            grabbedEgg.className = `egg absolute bottom-[-70px] left-0 ${rarity === 'SSR' ? 'ssr-animation' : ''}`;
+            grabbedEgg.style.backgroundColor = eggColors[rarity];
+            grabbedEgg.innerHTML = rarity === 'SSR' ? '👑' : (rarity === 'R' ? '✨' : '');
+            assembly.appendChild(grabbedEgg);
+
+            await wait(500);
+            assembly.style.top = "20px";
+            
+            await wait(1000);
+            assembly.style.left = "60px";
+            
+            await wait(1000);
+            tongs.classList.add('claw-open');
+            grabbedEgg.style.transition = "top 0.8s cubic-bezier(0.55, 0.055, 0.675, 0.19)";
+            grabbedEgg.style.top = "350px";
+            
+            await wait(800);
+            state.eggs.push({ id: Date.now(), rarity: rarity });
+            saveProgress();
+            
+            grabbedEgg.remove();
+            tongs.classList.remove('claw-open');
+            assembly.style.left = "50%";
+            
+            state.isGrabbing = false;
+            btn.disabled = false;
+            updateStatus(TRANSLATIONS[state.lang].statusGrab);
+        }
+
+        function hatchEgg(eggId) {
+            const eggIndex = state.eggs.findIndex(e => e.id === eggId);
+            if (eggIndex === -1) return;
+            const egg = state.eggs[eggIndex];
+            const pool = TOYS_DB.filter(t => t.rarity === egg.rarity);
+            const toy = pool[Math.floor(Math.random() * pool.length)];
+            state.collection[toy.id] = (state.collection[toy.id] || 0) + 1;
+            state.eggs.splice(eggIndex, 1);
+            saveProgress();
+            renderGallery();
+            renderCollection();
+            updateStatus(`${TRANSLATIONS[state.lang].statusHatch}: ${toy.name}!`);
+            if (egg.rarity === 'SSR') confettiEffect();
+        }
+
+        function showTab(tab) {
+            ['machine', 'eggs', 'toys'].forEach(t => {
+                const el = document.getElementById('tab-' + t);
+                if (el) el.classList.add('hidden-screen');
+                const gameEl = document.querySelector('.machine-viewport');
+                const ctrlEl = document.querySelector('.flex-col.items-center.gap-4');
+                if (tab === 'machine') {
+                    gameEl.classList.remove('hidden-screen');
+                    ctrlEl.classList.remove('hidden-screen');
+                } else {
+                    gameEl.classList.add('hidden-screen');
+                    ctrlEl.classList.add('hidden-screen');
+                }
+            });
+            if (tab !== 'machine') {
+                document.getElementById('tab-' + tab).classList.remove('hidden-screen');
+                if (tab === 'eggs') renderGallery();
+                if (tab === 'toys') renderCollection();
+            }
+        }
+
+        function renderGallery() {
+            const grid = document.getElementById('gallery-grid');
+            grid.innerHTML = '';
+            const eggColors = { "SSR": "#ffeb3b", "R": "#64b5f6", "C": "#ff80ab" };
+            state.eggs.forEach(egg => {
+                const item = document.createElement('div');
+                item.className = "nest";
+                const eggHtml = `<div class="egg ${egg.rarity === 'SSR' ? 'ssr-animation' : ''}" style="background-color: ${eggColors[egg.rarity]}">${egg.rarity === 'SSR' ? '👑' : (egg.rarity === 'R' ? '✨' : '')}</div>`;
+                item.innerHTML = `
+                    ${eggHtml}
+                    <button onclick="hatchEgg(${egg.id})" class="mt-2 bg-green-500 text-white px-6 py-2 rounded-full font-black shadow-lg active:scale-95 transition-all">HATCH</button>
+                `;
+                grid.appendChild(item);
+            });
+            if (state.eggs.length === 0) grid.innerHTML = '<p class="col-span-full text-center opacity-50 py-10 font-bold">The gallery is empty! Catch some eggs!</p>';
+        }
+
+        function renderCollection() {
+            const grid = document.getElementById('toy-grid');
+            grid.innerHTML = '';
+            TOYS_DB.forEach(toy => {
+                const count = state.collection[toy.id] || 0;
+                const hasToy = count > 0;
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-3xl flex flex-col items-center border-b-4 ${hasToy ? 'bg-white shadow-xl border-gray-100' : 'bg-gray-200 opacity-50 border-transparent'}`;
+                card.innerHTML = `
+                    <div class="text-5xl mb-3">${hasToy ? toy.emoji : '❓'}</div>
+                    <div class="text-[10px] font-black text-center leading-tight mb-1">${hasToy ? toy.name : 'UNKNOWN'}</div>
+                    <div class="text-[8px] uppercase tracking-tighter opacity-70 text-center font-black text-[var(--primary)]">${toy.rarity === 'SSR' ? '⭐ SUPER RARE' : toy.type}</div>
+                    <div class="mt-3 text-[12px] bg-[var(--primary)] text-white px-4 py-0.5 rounded-full font-black shadow-inner">x${count}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function updateStatus(msg) { document.getElementById('status-msg').innerText = msg; }
+        function wait(ms) { return new Promise(res => setTimeout(res, ms)); }
+        function saveProgress() { localStorage.setItem('clawbert_clone_data', JSON.stringify(state)); }
+        function loadProgress() {
+            const data = localStorage.getItem('clawbert_clone_data');
+            if (data) {
+                const parsed = JSON.parse(data);
+                state.eggs = parsed.eggs || [];
+                state.collection = parsed.collection || {};
+                state.lang = parsed.lang || 'en';
+                state.theme = parsed.theme || 'kawaii';
+                document.getElementById('set-lang').value = state.lang;
+                document.body.className = `theme-${state.theme}`;
+            }
+        }
+        function resetGame() {
+            if (confirm("Reset all progress? This cannot be undone!")) {
+                localStorage.removeItem('clawbert_clone_data');
+                location.reload();
+            }
+        }
+        function confettiEffect() {
+            updateStatus("✨ AMAZING! AN SSR FRIEND! ✨");
+            const originalColor = document.body.style.backgroundColor;
+            document.body.style.backgroundColor = "gold";
+            setTimeout(() => { document.body.style.backgroundColor = originalColor; }, 1500);
+        }
+    </script>
+</body>
+</html>
